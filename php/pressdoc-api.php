@@ -14,8 +14,12 @@
       return $arr_api_result;
     }
 
-    public function get_search() {
-      $str_api_url = self::$API_URL;
+    public function get_search( $result_page ) {
+      if( $result_page == '' )
+        $result_page = '1';
+
+      $str_api_url  = self::$API_URL;
+      $str_api_url .= "?page=" . $result_page;
 
       $arr_api_result = $this->fetch_json( $str_api_url );
       return $arr_api_result;

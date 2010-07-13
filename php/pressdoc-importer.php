@@ -2,7 +2,8 @@
 
   function pressdoc_news_page() {
     $api = new PressDocAPI();
-    $pressdocs = $api->get_search();
+
+    $pressdocs = $api->get_search($_GET['p']);
 
     if(!empty($_GET['contentid'])) {
       $message = pressdoc_add_item($_GET['contentid']);
@@ -28,6 +29,19 @@
 
         <p>Want news? Find something you like below, click 'Save to Drafts' and then publish away.</p>
 
+        <?php
+          $link = parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) . '?page=' . $_GET['page'];
+          echo pressdoc_render_pagination(
+            $pressdocs['current_page'],
+            $pressdocs['total_pages'],
+            $pressdocs['total_entries'],
+            $link,
+            1 + ($pressdocs['current_page']-1) * $pressdocs['per_page'],
+            1 + ($pressdocs['current_page']) * $pressdocs['per_page']
+          );
+        ?>
+        <br />
+
         <div id="poststuff" class="metaebox-holder has-right-sidebar">
           <div id="side-info-column" class="inner-sidebar">
           </div>
@@ -49,6 +63,8 @@
               <?php echo $table_content; ?>
             </tbody>
           </table>
+          <br />
+          <?php echo pressdoc_render_simple_pagination($pressdocs['current_page'], $pressdocs['total_pages'], $link) ?>
         </div>
       </div>
     <?php
@@ -69,42 +85,52 @@
 
     $arr_images = array ();
     foreach ( $pressdoc['images'] as $image ) {
-      $arr_images[] = '<img class="alignnone" title="' . $image['description'] . '" src="'. $image['medium_url'] . '" alt="' . $image['description'] . '" />';
+      $arr_images[] = '<a href="'. $image['original_url'] . '" title="' . $image['description'] . '"><img class="alignnone" title="' . $image['description'] . '" src="'. $image['medium_url'] . '" alt="' . $image['description'] . '" /></a>';
     }
-    $str_images = implode("\n", $arr_images);
+    $str_images = implode('', $arr_images);
 
-    $postcontent .= '<!-- PRESSDOC WATERMARK --><hr />';
-    $postcontent .= '<p><a href="' . $pressdoc['get_permalink'] . '">This PressDoc was published by ' . $pressdoc['company']['name'] . ' on ' . date('l jS F Y', strtotime($pressdoc['release_date'])) . '</a></p>';
+    $arr_videos = array ();
+    foreach ( $pressdoc['videos'] as $video ) {
+      $arr_videos[] = $video['embed_url_html'] . '<p>' . $video['description'] . '</p>';
+    }
+    $str_videos = implode("\n", $arr_videos);
+
+    $postcontent .= '<!-- PRESSDOC WATERMARK -->';
+    $postcontent .= '<strong>' . $pressdoc['medium_description'] . '</strong>';
     $postcontent .= $pressdoc['large_description'];
     $postcontent .= '<br /><br />';
-    $postcontent .= $str_images;
-    $postcontent .= '<hr /><!-- END PRESSDOC WATERMARK -->';
+    $postcontent .= $str_images . "\n";
+    $postcontent .= $str_videos;
+    $postcontent .= '<p><a href="' . $pressdoc['get_permalink'] . '">This PressDoc was published by ' . $pressdoc['company']['name'] . ' on ' . date('l jS F Y', strtotime($pressdoc['release_date'])) . '</a></p>';
+    $postcontent .= '<!-- END PRESSDOC WATERMARK -->';
+
+    $arr_tags = array();
+    foreach ( $pressdoc['categories'] as $category ) {
+      $arr_tags[] = $category['name'];
+    }
 
     $data = array(
       'ID'            => null,
       'post_content'  => $postcontent,
       'post_title'    => $pressdoc['title'],
-      'post_excerpt'  => $pressdoc['medium_description']
+      'post_excerpt'  => $pressdoc['medium_description'],
+      'tags_input'    => $arr_tags
     );
 
     $pressdoc_post_id = wp_insert_post( $data );
 
-    $message[] = '<div class="updated">';
-    $message[] = '  <p><strong>Ready to publish:</strong>  <em>"' . $data['post_title'] . '"</em> was successfully saved in <strong><a href="' . admin_url('edit.php?post_status=draft') . '">Draft Mode</a></strong>. Now you can <strong><a href="' . admin_url('post.php?action=edit&post=' . $pressdoc_post_id) . '">edit and publish</a></strong> your blog post.</p>';
-    $message[] = '</div>';
-
-    return implode("\n", $message);
+    wp_redirect(admin_url('post.php?action=edit&post=' . $pressdoc_post_id));
   }
 
   function pressdoc_render_search_results( $arr_pressdocs ) {
     $arr_html_output = array ();
 
-    foreach ( $arr_pressdocs as $pressdoc ) {
-      $link = $_SERVER['PHP_SELF'] . '?page=' . $_GET['page'] . '&contentid=' . $pressdoc['id'];
+    foreach ( $arr_pressdocs['pressdocs'] as $pressdoc ) {
+      $link = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) . '?page=' . $_GET['page'] . '&noheader=true&contentid=' . $pressdoc['id'];
 
       $image = '';
       if ( !empty ( $pressdoc['company']['small_logo_url'] ) ) {
-        $image  = '<div style="border:1px solid #EEEEEE; float:left; height:125px; overflow:hidden; width:125px;">';
+        $image  = '<div style="float:left; height:125px; overflow:hidden; width:125px;">';
         $image .= '  <img src="' . $pressdoc['company']['small_logo_url'] . '" style="padding:5px 0;" alt="' . $pressdoc['company']['name'] . ' logo">';
         $image .= '</div>';
       }
@@ -129,11 +155,74 @@
     return implode ( "\n", $arr_html_output );
   }
 
+  function pressdoc_render_pagination( $current_page, $total_pages, $total_items, $link, $start_item, $end_item ) {
+    $pagination = array();
+    $pagination[] = '<div class="tablenav">';
+
+    $pagination[] = '<div class="alignleft actions">';
+    $pagination[] = '<p class="displaying-num">';
+    if ( $total_pages == 0 ) {
+      $pagination[] = '<strong>There are no results available for your search. Please try again.</strong>';
+    } else {
+      $pagination[] = 'Displaying ' . number_format( $start_item ) . ' to ' . number_format( $end_item ) . ' of ' . number_format( $total_items ) . ' PressDocs.';
+    }
+    $pagination[] = '</p>';
+    $pagination[] = '</div>';
+
+    if ( $total_pages > 1 ) {
+      $window = 3;
+      $p  = $current_page;
+      $lp = $current_page - $window;
+      $hp = $current_page + $window;
+
+      $pagination[] = '<div class="tablenav-pages">';
+      $pagination[] = '<span class="displaying-num">Go to page:</span>';
+
+      while ( ( $lp < $total_pages + 1 ) && ( $lp <= $hp ) ) {
+        if ( ( $lp > 0 ) ) {
+          if ( $lp == $p ) {
+            $pagination[] = '<span class="page-numbers current">' . number_format( $lp ) . '</span>';
+          } else {
+            $pagination[] = '<a href="' . $link . '&p=' . $lp . '" class="page-numbers" alt="Page number ' . number_format( $lp ) . '">' . number_format( $lp ) . '</a>';
+          }
+        }
+        $lp++;
+      }
+      if ( ( $lp - 1 ) != $total_pages ) {
+        $pagination[] = ' ... <a href="' . $link . '&p=' . $total_pages. '" class="page-numbers" alt="Page number ' . number_format( $total_pages ) . '">' . number_format( $total_pages ) . '</a>';
+      }
+      $pagination[] = '</div>';
+    }
+
+    $pagination[] = '</div>';
+    return implode( "\n", $pagination );
+  }
+
+  function pressdoc_render_simple_pagination( $current_page, $total_pages, $link ) {
+    $pagination = array();
+
+    if ( $total_pages > 1 ) {
+      if ( $current_page <= $total_pages && $current_page != 1 ) {
+        $previous = $current_page - 1;
+        $pagination[] = '<a href="' . $link . '&p=' . $previous .'" class="button" alt="Page number ' . $previous . '"> << Previous </a>';
+      }
+
+      if ( $current_page != $total_pages ) {
+        $next = $current_page + 1;
+        $pagination[] = '<a href="' . $link . '&p=' . $next . '" class="button" style="float:right" alt="Page number ' . $next . '"> Next >> </a>';
+      }
+    }
+
+    return implode( "\n", $pagination );
+  }
+
   function pressdoc_add_news_page() {
     global $wpdb;
 
-    if( function_exists( 'add_submenu_page' ) ) {
-      add_submenu_page( 'post.php', __ ( 'News' ), __ ( 'News' ), 2, __FILE__, 'pressdoc_news_page' );
+    if( function_exists( 'add_menu_page' ) ) {
+      //$title = sprintf( __('News %s'), "<span id='awaiting-mod' class='count-50'><span class='pending-count'>" . number_format_i18n(50) . "</span></span>" );
+      $title = __('News');
+      add_menu_page( __ ( 'News' ), $title, 2, __FILE__, 'pressdoc_news_page', WP_PLUGIN_URL . '/' . str_replace(basename( __FILE__), "", plugin_basename(__FILE__)) . '../img/pressdoc-logo.png', 6 );
     }
   }
 
