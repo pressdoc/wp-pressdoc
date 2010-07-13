@@ -90,7 +90,7 @@
     $pressdoc_post_id = wp_insert_post( $data );
 
     $message[] = '<div class="updated">';
-    $message[] = '  <p><strong>Ready to publish:</strong>  <em>"' . $data['post_title'] . '"</em> was successfully saved in <strong><a href="' . admin_url('edit.php?post_status=draft') . '">Draft Mode</a></strong>. Now you can <strong><a href="' . admin_url('post.php?action=edit&post=' . pressdoc_post_id) . '">edit and publish</a></strong> your blog post.</p>';
+    $message[] = '  <p><strong>Ready to publish:</strong>  <em>"' . $data['post_title'] . '"</em> was successfully saved in <strong><a href="' . admin_url('edit.php?post_status=draft') . '">Draft Mode</a></strong>. Now you can <strong><a href="' . admin_url('post.php?action=edit&post=' . $pressdoc_post_id) . '">edit and publish</a></strong> your blog post.</p>';
     $message[] = '</div>';
 
     return implode("\n", $message);
