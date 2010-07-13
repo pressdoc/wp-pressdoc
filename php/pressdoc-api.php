@@ -1,43 +1,42 @@
 <?php
 
-include (ABSPATH . '/wp-includes/class-json.php');
+  include ( ABSPATH . '/wp-includes/class-json.php' );
 
-class PressDocNewsFeedAPI {
+  class PressDocAPI {
+    public static $API_URL      = 'http://pressdoc.com/api/pressdocs.json';
+    public static $API_ITEM_URL = 'http://pressdoc.com/api/pressdocs/%s.json';
 
-  public static $PRESSDOC_NEWS_FEED_API_URL      = "http://pressdoc.com/api/pressdocs.json";
-  public static $PRESSDOC_NEWS_FEED_API_ITEM_URL = "http://pressdoc.com/api/pressdocs/%s.json";
+    public function get_pressdoc( $str_pressdoc_id ) {
+      $str_api_url = self::$API_ITEM_URL;
+      $str_api_url = sprintf( $str_api_url, $str_pressdoc_id );
 
-  public function pressdoc_news_feed_api_item($str_item_id) {
-    $str_api_url = self::$PRESSDOC_NEWS_FEED_API_ITEM_URL;
-    $str_api_url = sprintf($str_api_url, $str_item_id);
+      $arr_api_result = $this->fetch_json( $str_api_url );
+      return $arr_api_result;
+    }
 
-    $arr_api_result = $this->convertJson($str_api_url);
-    return $arr_api_result;
-  }
+    public function get_search() {
+      $str_api_url = self::$API_URL;
 
-  public function pressdoc_news_feed_api_search() {
-    $str_api_url = self::$PRESSDOC_NEWS_FEED_API_URL;
+      $arr_api_result = $this->fetch_json( $str_api_url );
+      return $arr_api_result;
+    }
 
-    $arr_api_result = $this->convertJson($str_api_url);
-    return $arr_api_result;
-  }
+    private function fetch_json( $str_api_url ) {
+      $data = file_get_contents ( $str_api_url );
 
-  public function convertJson($str_api_url) {
-    $data = file_get_contents ( $str_api_url );
-
-    // Future-friendly json_decode
-    if(!function_exists('json_decode')) {
-      function json_decode($data, $bool) {
-        if ($bool) {
-          $json = new Services_JSON(SERVICES_JSON_LOOSE_TYPE);
-        } else {
-          $json = new Services_JSON();
+      if( !function_exists( 'json_decode' ) ) {
+        function json_decode( $data, $bool ) {
+          if ( $bool ) {
+            $json = new Services_JSON( SERVICES_JSON_LOOSE_TYPE );
+          } else {
+            $json = new Services_JSON();
+          }
+          return ( $json->decode( $data ) );
         }
-        return ( $json->decode($data) );
+      } else {
+        return ( json_decode( $data, true ) );
       }
-    } else {
-      return ( json_decode($data, true) );
     }
   }
 
-}
+?>
